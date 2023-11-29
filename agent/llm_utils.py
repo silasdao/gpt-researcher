@@ -48,12 +48,10 @@ def create_chat_completion(
         raise ValueError("Websocket cannot be None when stream is True")
 
     # create response
-    for attempt in range(10):  # maximum of 10 attempts
-        response = send_chat_completion_request(
+    for _ in range(10):
+        return send_chat_completion_request(
             messages, model, temperature, max_tokens, stream, websocket
         )
-        return response
-
     logging.error("Failed to get response from OpenAI API")
     raise RuntimeError("Failed to get response from OpenAI API")
 
@@ -61,23 +59,22 @@ def create_chat_completion(
 def send_chat_completion_request(
     messages, model, temperature, max_tokens, stream, websocket
 ):
-    if not stream:
-        result = lc_openai.ChatCompletion.create(
-            model=model, # Change model here to use different models
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            provider=CFG.llm_provider, # Change provider here to use a different API
-        )
-        return result["choices"][0]["message"]["content"]
-    else:
+    if stream:
         return stream_response(model, messages, temperature, max_tokens, websocket)
+    result = lc_openai.ChatCompletion.create(
+        model=model, # Change model here to use different models
+        messages=messages,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        provider=CFG.llm_provider, # Change provider here to use a different API
+    )
+    return result["choices"][0]["message"]["content"]
 
 
 async def stream_response(model, messages, temperature, max_tokens, websocket):
     paragraph = ""
     response = ""
-    print(f"streaming response...")
+    print("streaming response...")
 
     for chunk in lc_openai.ChatCompletion.create(
             model=model,
@@ -94,7 +91,7 @@ async def stream_response(model, messages, temperature, max_tokens, websocket):
             if "\n" in paragraph:
                 await websocket.send_json({"type": "report", "output": paragraph})
                 paragraph = ""
-    print(f"streaming response complete")
+    print("streaming response complete")
     return response
 
 
